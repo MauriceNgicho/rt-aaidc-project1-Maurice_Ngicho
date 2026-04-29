@@ -1,0 +1,88 @@
+LangGraph Core Concepts
+========================
+LangGraph is a library for building stateful, multi-actor LLM applications using graphs.
+It extends LangChain with controllable agent orchestration and is built on top of it.
+
+Why LangGraph:
+- LangChain chains are linear (A → B → C)
+- LangGraph supports cycles, branching, and loops — essential for agents
+- Built-in persistence (checkpointing) so agents can resume after failures
+- Human-in-the-loop support: pause execution for human review or input
+- Streaming: stream tokens, state updates, and intermediate steps
+
+Key concepts:
+
+StateGraph:
+    The main graph class. State is a TypedDict shared across all nodes.
+
+    from langgraph.graph import StateGraph, END
+    from typing import TypedDict, Annotated
+    import operator
+
+    class AgentState(TypedDict):
+        messages: Annotated[list, operator.add]  # append-only list
+        next_step: str
+        iteration_count: int
+
+    graph = StateGraph(AgentState)
+
+Nodes:
+    Python functions that receive the current state and return a state update dict.
+    Only the keys you return are updated — other keys remain unchanged.
+
+    def my_node(state: AgentState) -> dict:
+        new_message = "processed: " + str(state["messages"][-1])
+        return {"messages": [new_message], "iteration_count": state["iteration_count"] + 1}
+
+    graph.add_node("my_node", my_node)
+
+Edges:
+    Define the flow between nodes.
+
+    graph.add_edge("node_a", "node_b")          # unconditional: always go A → B
+
+    graph.add_conditional_edges(                 # conditional routing
+        "router_node",
+        lambda state: state["next_step"],        # routing function returns a key
+        {
+            "continue": "worker_node",           # key → destination node
+            "done": END                          # END terminates the graph
+        }
+    )
+
+Entry point:
+    graph.set_entry_point("first_node")          # or graph.add_edge(START, "first_node")
+
+Compiling and running:
+    app = graph.compile()
+    result = app.invoke({"messages": [], "next_step": "continue", "iteration_count": 0})
+
+Checkpointing (persistence across runs):
+    from langgraph.checkpoint.memory import MemorySaver
+
+    checkpointer = MemorySaver()
+    app = graph.compile(checkpointer=checkpointer)
+
+    config = {"configurable": {"thread_id": "user-session-42"}}
+    result = app.invoke(initial_state, config=config)
+
+    # Resume the same thread later — state is automatically restored
+    result2 = app.invoke(new_input, config=config)
+
+Human-in-the-loop:
+    # Pause before a sensitive node for human approval
+    app = graph.compile(
+        checkpointer=checkpointer,
+        interrupt_before=["sensitive_node"]
+    )
+
+    # Run until the interrupt
+    app.invoke(state, config=config)
+
+    # Inspect state, then resume
+    app.invoke(None, config=config)
+
+Streaming graph execution:
+    for event in app.stream(state, config=config):
+        for node_name, node_output in event.items():
+            print(f"Node '{node_name}': {node_output}")

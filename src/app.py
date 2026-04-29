@@ -1,4 +1,6 @@
 import os
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+os.environ["CHROMA_TELEMETRY"] = "False"
 from typing import List
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
@@ -20,12 +22,22 @@ def load_documents() -> List[str]:
         List of sample documents
     """
     results = []
-    # TODO: Implement document loading
-    # HINT: Read the documents from the data directory
-    # HINT: Return a list of documents
-    # HINT: Your implementation depends on the type of documents you are using (.txt, .pdf, etc.)
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
+    for filename in os.listdir(data_dir):
+        if filename.endswith(".txt"):
+            filepath = os.path.join(data_dir, filename)
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+            if content:
+                results.append({
+                    "content": content,
+                    "metadata": {
+                        "source": filename,
+                        "file_path": filepath,
+                    },
+                })
+            print(f"Loaded document: {filename}")
 
-    # Your implementation here
     return results
 
 
@@ -48,13 +60,27 @@ class RAGAssistant:
         # Initialize vector database
         self.vector_db = VectorDB()
 
-        # Create RAG prompt template
-        # TODO: Implement your RAG prompt template
-        # HINT: Use ChatPromptTemplate.from_template() with a template string
-        # HINT: Your template should include placeholders for {context} and {question}
-        # HINT: Design your prompt to effectively use retrieved context to answer questions
-        self.prompt_template = None  # Your implementation here
+        self.prompt_template = ChatPromptTemplate.from_template(
+            """
+            You are a technical assistant. Your only source of information is the context provided below.
+            STRICT RULES:
+        STRICT RULES:
+        - Answer ONLY using information found in the context below.
+        - Do not use any information that is not explicitly stated in the context.
+        - You MUST NOT explain what you know instead.
+        - If the context does not contain enough information to answer, respond with exactly: "I don't have enough information to answer that question."
+        - Do NOT add any extra commentary, suggestions, or information beyond what the context contains.
+        - Do NOT mention LangChain or any other topic unless it is directly relevant to the question AND present in the context.
 
+            Context:
+            {context}
+
+            Question:
+            {question}
+
+            Answer:
+            """
+        )
         # Create the chain
         self.chain = self.prompt_template | self.llm | StrOutputParser()
 
@@ -65,21 +91,15 @@ class RAGAssistant:
         Initialize the LLM by checking for available API keys.
         Tries OpenAI, Groq, and Google Gemini in that order.
         """
-        # Check for OpenAI API key
-        if os.getenv("OPENAI_API_KEY"):
-            model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-            print(f"Using OpenAI model: {model_name}")
-            return ChatOpenAI(
-                api_key=os.getenv("OPENAI_API_KEY"), model=model_name, temperature=0.0
-            )
-
-        elif os.getenv("GROQ_API_KEY"):
+        # Check for Groq API key
+        if os.getenv("GROQ_API_KEY"):
             model_name = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
             print(f"Using Groq model: {model_name}")
             return ChatGroq(
                 api_key=os.getenv("GROQ_API_KEY"), model=model_name, temperature=0.0
             )
 
+        # If Groq keys are found, check for Google API key
         elif os.getenv("GOOGLE_API_KEY"):
             model_name = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash")
             print(f"Using Google Gemini model: {model_name}")
@@ -87,6 +107,13 @@ class RAGAssistant:
                 google_api_key=os.getenv("GOOGLE_API_KEY"),
                 model=model_name,
                 temperature=0.0,
+            )
+        # If neither Groq nor Google keys are found, check for OpenAI API key
+        elif os.getenv("OPENAI_API_KEY"):
+            model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+            print(f"Using OpenAI model: {model_name}")
+            return ChatOpenAI(
+                api_key=os.getenv("OPENAI_API_KEY"), model=model_name, temperature=0.0
             )
 
         else:
@@ -115,13 +142,16 @@ class RAGAssistant:
             Dictionary containing the answer and retrieved context
         """
         llm_answer = ""
-        # TODO: Implement the RAG query pipeline
-        # HINT: Use self.vector_db.search() to retrieve relevant context chunks
-        # HINT: Combine the retrieved document chunks into a single context string
-        # HINT: Use self.chain.invoke() with context and question to generate the response
-        # HINT: Return a string answer from the LLM
 
-        # Your implementation here
+        search_results = self.vector_db.search(input, n_results=n_results)
+    
+        chunks = search_results.get("documents", [])
+        context = "\n\n---\n\n".join(chunks) if chunks else "No relevant context found."
+
+        llm_answer = self.chain.invoke({
+            "context": context,
+            "question": input,
+        })
         return llm_answer
 
 
@@ -146,7 +176,7 @@ def main():
             if question.lower() == "quit":
                 done = True
             else:
-                result = assistant.query(question)
+                result = assistant.invoke(question)
                 print(result)
 
     except Exception as e:

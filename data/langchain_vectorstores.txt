@@ -1,0 +1,61 @@
+Vector Stores in LangChain
+===========================
+Vector stores allow you to store document embeddings and perform similarity search.
+They are the backbone of RAG (Retrieval-Augmented Generation) systems.
+
+ChromaDB example (local, open-source):
+    import chromadb
+    from langchain_chroma import Chroma
+    from langchain_openai import OpenAIEmbeddings
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+    vectorstore = Chroma(
+        collection_name="my_collection",
+        embedding_function=embeddings,
+        persist_directory="./chroma_db"
+    )
+
+    # Add documents
+    vectorstore.add_texts(
+        texts=["LangChain is a framework for LLMs."],
+        metadatas=[{"source": "intro.txt"}]
+    )
+
+    # Similarity search
+    results = vectorstore.similarity_search("What is LangChain?", k=3)
+
+    # Search with scores
+    results_with_scores = vectorstore.similarity_search_with_score("What is LangChain?", k=3)
+
+    # Convert to retriever
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+
+FAISS example (in-memory, fast):
+    from langchain_community.vectorstores import FAISS
+
+    vectorstore = FAISS.from_texts(texts, embeddings)
+    vectorstore.save_local("faiss_index")
+    loaded = FAISS.load_local("faiss_index", embeddings)
+
+Common vector stores comparison:
+- ChromaDB: Open-source, runs locally, great for development and small projects
+- FAISS: Facebook AI Similarity Search, extremely fast in-memory search
+- Pinecone: Managed cloud vector database, scales to billions of vectors
+- Weaviate: Open-source vector search engine with GraphQL API
+- pgvector: PostgreSQL extension, good if you already use Postgres
+- Qdrant: High-performance open-source vector database
+- Milvus: Distributed vector database for large-scale applications
+
+Embedding models:
+- OpenAI text-embedding-3-small: 1536 dimensions, fast, cheap
+- OpenAI text-embedding-3-large: 3072 dimensions, higher accuracy
+- Google models/gemini-embedding-001: 768 dimensions, free tier available
+- HuggingFace BAAI/bge-small-en-v1.5: Free, runs locally
+
+PersistentClient in ChromaDB stores the database to disk so it survives restarts.
+In-memory ChromaDB (EphemeralClient) is faster but loses data on shutdown.
+
+Best practices:
+- Always delete and recreate the vector store when changing embedding models
+- Use metadata filters to narrow searches before vector similarity
+- Index chunk_id and source in metadata for traceability

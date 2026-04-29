@@ -1,410 +1,255 @@
-# RAG-Based AI Assistant - AAIDC Project 1 Template
+# rt-aaidc-project1-template
 
-## 🤖 What is this?
-
-This is a **learning template** for building a RAG (Retrieval-Augmented Generation) AI assistant. RAG systems combine document search with AI chat - they can answer questions about your specific documents by finding relevant information and using it to generate responses.
-
-**Think of it as:** ChatGPT that knows about YOUR documents and can answer questions about them.
-
-## 🎯 What you'll build
-
-By completing this project, you'll have an AI assistant that can:
-
-- 📄 **Load your documents** (PDFs, text files, etc.)
-- 🔍 **Search through them** to find relevant information
-- 💬 **Answer questions** using the information it found
-- 🧠 **Combine multiple sources** to give comprehensive answers
-
-
-Welcome to your RAG (Retrieval-Augmented Generation) project! This repository provides a **template** that you need to complete. The framework is set up, but the core functionality is missing - that's your job to implement!
-
-## 🎯 What You Need to Build
-
-You will implement a complete RAG system that can:
-
-- Load and chunk documents from the `data/` directory
-- Create embeddings and store them in a vector database
-- Search for relevant context based on user queries
-- Generate responses using retrieved context and an LLM
-
-
-## 📝 Implementation Steps
-
-The project requires implementing 7 main steps:
-
-1. **Prepare Your Documents** - Add your own documents to the data directory
-2. **Document Loading** - Load documents from files into the system
-3. **Text Chunking** - Split documents into smaller, searchable chunks
-4. **Document Ingestion** - Process and store documents in the vector database  
-5. **Similarity Search** - Find relevant documents based on queries
-6. **RAG Prompt Template** - Design effective prompts for the LLM
-7. **RAG Query Pipeline** - Complete query-response pipeline using retrieved context
+A **Retrieval-Augmented Generation (RAG) assistant** built with LangChain, ChromaDB, and support for multiple LLM providers. The assistant answers questions grounded strictly in a curated knowledge base of LangChain and LangGraph technical documentation — refusing to answer questions outside its context.
 
 ---
 
-### Step 1: Prepare Your Documents
+## Features
 
-**Replace the sample documents with your own content**
+- **Multi-provider LLM support** — OpenAI, Groq, and Google Gemini, selected automatically based on available API keys
+- **Google Gemini embeddings** — Uses `models/gemini-embedding-001` for document and query embedding
+- **ChromaDB vector store** — Persistent local vector database with similarity search
+- **Strict context grounding** — Prompt-engineered to refuse out-of-context questions rather than hallucinate
+- **Recursive text chunking** — Documents split with overlap to preserve context across chunk boundaries
+- **Modular architecture** — `VectorDB` and `RAGAssistant` are cleanly separated for easy extension
 
-The `data/` directory contains sample files on various topics. Replace these with documents relevant to your domain:
+---
+
+## How It Works
 
 ```
-data/
-├── your_topic_1.txt
-├── your_topic_2.txt
-└── your_topic_3.txt
+┌─────────────────────────────────────────────────────────────┐
+│                        INDEXING                             │
+│                                                             │
+│  data/*.txt  →  Chunking  →  Embedding  →  ChromaDB        │
+│  (documents)    (1500 chars)  (Gemini)      (vector store)  │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                        QUERYING                             │
+│                                                             │
+│  User Question  →  Embed Query  →  Similarity Search        │
+│       ↓                                  ↓                  │
+│  LLM Answer     ←  Prompt + Context  ←  Top-K Chunks       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-Each file should contain text content you want your RAG system to search through.
+1. **Load** — `.txt` files are read from the `data/` directory
+2. **Chunk** — Each document is split into overlapping chunks using `RecursiveCharacterTextSplitter`
+3. **Embed** — Chunks are converted to vector embeddings using Google Gemini
+4. **Store** — Embeddings are stored in a persistent ChromaDB collection
+5. **Retrieve** — At query time, the user's question is embedded and the top-K most similar chunks are retrieved
+6. **Generate** — Retrieved chunks are injected into a prompt as context, and the LLM generates a grounded answer
 
 ---
 
-### Step 2: Implement Document Loading
-
-**Location:** `src/app.py`
-
-```python
-def load_documents() -> List[str]:
-    """
-    Load documents for demonstration.
-
-    Returns:
-        List of sample documents
-    """
-    results = []
-    # TODO: Implement document loading
-    # HINT: Read the documents from the data directory
-    # HINT: Return a list of documents
-    # HINT: Your implementation depends on the type of documents you are using (.txt, .pdf, etc.)
-
-    # Your implementation here
-    return results
-```
-
-**What you need to do:**
-
-- Read files from the `data/` directory
-- Load the content of each file into memory
-- Return a list of document dictionaries with content and metadata
-- You implementation should handle the type of files you are using (text, pdf, etc)
-
-**Key considerations:**
-
-- Use `os.listdir()` or `glob.glob()` to find files in the data directory
-- Read file contents using appropriate encoding (usually 'utf-8')
-- Create document dictionaries with 'content' and 'metadata' fields
-- Handle errors gracefully (missing files, encoding issues, etc.)
-
----
-
-### Step 3: Implement Text Chunking
-
-**Location:** `src/vectordb.py`
-
-```python
-def chunk_text(self, text: str, chunk_size: int = 500) -> List[str]:
-    """
-    Split text into smaller chunks for better retrieval.
-  
-    Args:
-        text: Input text to chunk
-        chunk_size: Approximate number of characters per chunk
-  
-    Returns:
-        List of text chunks
-    """
-    # TODO: Your implementation here
-```
-
-**What you need to do:**
-
-- Choose a chunking strategy (word-based, sentence-based, or use LangChain's text splitters)
-- Split the input text into manageable chunks
-- Return a list of text strings
-
-**Hint:** You have multiple options - start simple with word-based splitting or explore LangChain's `RecursiveCharacterTextSplitter`.
-
----
-
-### Step 4: Implement Document Ingestion
-
-**Location:** `src/vectordb.py`
-
-```python
-def add_documents(self, documents: List[Dict[str, Any]]) -> None:
-    """
-    Process documents and add them to the vector database.
-  
-    Args:
-        documents: List of documents with 'content' and optional 'metadata'
-    """
-    # TODO: Your implementation here
-```
-
-**What you need to do:**
-
-- Loop through the documents list
-- Extract content and metadata from each document
-- Use your `chunk_text()` method to split documents
-- Create embeddings using `self.embedding_model.encode()`
-- Store everything in ChromaDB using `self.collection.add()`
-
-**Key components:**
-
-- Chunk each document's content
-- Generate unique IDs for each chunk
-- Create embeddings for all chunks
-- Store in the vector database
-
----
-
-### Step 5: Implement Similarity Search
-
-**Location:** `src/vectordb.py`
-
-```python
-def search(self, query: str, n_results: int = 5) -> Dict[str, Any]:
-    """
-    Find documents similar to the query.
-  
-    Args:
-        query: Search query
-        n_results: Number of results to return
-  
-    Returns:
-        Dictionary with search results
-    """
-    # TODO: Your implementation here
-```
-
-**What you need to do:**
-
-- Create an embedding for the query using `self.embedding_model.encode()`
-- Search the ChromaDB collection using `self.collection.query()`
-- Return results in the expected format with keys: `documents`, `metadatas`, `distances`, `ids`
-
----
-
-### Step 6: Implement RAG Prompt Template
-
-**Location:** `src/app.py`
-
-```python
-# Create RAG prompt template
-# TODO: Implement your RAG prompt template
-# HINT: Use ChatPromptTemplate.from_template() with a template string
-# HINT: Your template should include placeholders for {context} and {question}
-# HINT: Design your prompt to effectively use retrieved context to answer questions
-self.prompt_template = None  # Your implementation here
-```
-
-**What you need to do:**
-
-- Design a prompt template that effectively combines retrieved context with user questions
-- Use `ChatPromptTemplate.from_template()` to create the template
-- Include placeholders for `{context}` (retrieved documents) and `{question}` (user query)
-- Consider how to instruct the LLM to use the context appropriately
-- Handle cases where the context might not contain relevant information
-
-**Key considerations:**
-
-- Clear instructions for the AI on how to use the retrieved context
-- Guidance on what to do when context is insufficient or irrelevant
-- Consistent formatting that works well with your chosen LLM
-- Balance between being specific enough to be helpful and flexible enough to handle various queries
-
----
-
-### Step 7: Implement RAG Query Pipeline
-
-**Location:** `src/app.py`
-
-```python
-def query(self, question: str, n_results: int = 3) -> Dict[str, Any]:
-    """
-    Answer questions using retrieved context.
-  
-    Args:
-        question: User's question
-        n_results: Number of context chunks to retrieve
-  
-    Returns:
-        Dictionary with answer and context information
-    """
-    # TODO: Your implementation here
-```
-
-**What you need to do:**
-
-- Use `self.vector_db.search()` to find relevant context
-- Combine retrieved chunks into a context string
-- Use `self.chain.invoke()` to generate a response
-- Return a dictionary with the answer and metadata
-
-**The RAG pipeline:**
-
-1. Search for relevant chunks
-2. Combine chunks into context
-3. Generate response using LLM + context
-4. Return structured results
-
-
----
-
-## 🧪 Testing Your Implementation
-
-### Test Individual Components
-
-1. **Test chunking:**
-
-   ```python
-   from src.vectordb import VectorDB
-   vdb = VectorDB()
-   chunks = vdb.chunk_text("Your test text here...")
-   print(f"Created {len(chunks)} chunks")
-   ```
-2. **Test document loading:**
-
-   ```python
-   documents = [{"content": "Test document", "metadata": {"title": "Test"}}]
-   vdb.add_documents(documents)
-   ```
-3. **Test search:**
-
-   ```python
-   results = vdb.search("your test query")
-   print(f"Found {len(results['documents'])} results")
-   ```
-
-### Test Full System
-
-Once implemented, run:
-
-```bash
-python src/app.py
-```
-
-Try these example questions:
-
-- "What is [topic from your documents]?"
-- "Explain [concept from your documents]"
-- "How does [process from your documents] work?"
-
----
-
-## 🔧 Implementation Freedom
-
-**Important:** This template uses specific packages (ChromaDB, LangChain, HuggingFace Transformers) and approaches, but **you are completely free to use whatever you prefer!**
-
-### Alternative Options You Can Choose:
-
-**Vector Databases:**
-- FAISS (Facebook AI Similarity Search)
-- Pinecone
-- Weaviate
-- Qdrant
-- Or any other vector store you prefer
-
-**LLM Frameworks:**
-- Direct API calls (OpenAI, Anthropic, etc.)
-- Ollama for local models
-- Hugging Face Transformers
-- LlamaIndex instead of LangChain
-
-**Embedding Models:**
-- OpenAI embeddings (ada-002)
-- Cohere embeddings
-- Any Hugging Face model
-- Local embedding models
-
-**Text Processing:**
-- Custom chunking logic
-- spaCy for advanced NLP
-- NLTK for text processing
-- Your own parsing methods
-
----
-
-## 🚀 Setup Instructions
-
-### Prerequisites
-
-Before starting, make sure you have:
-
-- Python 3.8 or higher installed
-- An API key from **one** of these providers:
-  - [OpenAI](https://platform.openai.com/api-keys) (most popular)
-  - [Groq](https://console.groq.com/keys) (free tier available)
-  - [Google AI](https://aistudio.google.com/app/apikey) (competitive pricing)
-
-### Quick Setup
-
-1. **Clone and install dependencies:**
-
-   ```bash
-   git clone [your-repo-url]
-   cd rt-aaidc-project1-template
-   pip install -r requirements.txt
-   ```
-
-2. **Configure your API key:**
-
-   ```bash
-   # Create environment file (choose the method that works on your system)
-   cp .env.example .env    # Linux/Mac
-   copy .env.example .env  # Windows
-   ```
-
-   Edit `.env` and add your API key:
-
-   ```
-   OPENAI_API_KEY=your_key_here
-   # OR
-   GROQ_API_KEY=your_key_here  
-   # OR
-   GOOGLE_API_KEY=your_key_here
-   ```
-
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 rt-aaidc-project1-template/
+├── data/                          # Knowledge base documents (.txt)
+│   ├── langchain_introduction.txt
+│   ├── langchain_lcel.txt
+│   ├── langchain_chat_models.txt
+│   ├── langchain_vectorstores.txt
+│   ├── langchain_retrievers.txt
+│   ├── langchain_text_splitters.txt
+│   ├── langchain_rag_tutorial.txt
+│   ├── langgraph_concepts.txt
+│   └── langgraph_quickstart.txt
 ├── src/
-│   ├── app.py           # Main RAG application (implement Steps 2, 6-7)
-│   └── vectordb.py      # Vector database wrapper (implement Steps 3-5)
-├── data/               # Replace with your documents (Step 1)
-│   ├── *.txt          # Your text files here
-├── requirements.txt    # All dependencies included
-├── .env.example       # Environment template
-└── README.md          # This guide
+│   ├── app.py                     # RAGAssistant class and main entry point
+│   ├── vectordb.py                # VectorDB class (ChromaDB + embeddings)
+│   └── chroma_db/                 # Persistent ChromaDB storage (auto-generated)
+├── .env                           # API keys and configuration (not committed)
+├── requirements.txt               # Full dependencies
+├── lean_requirements.txt          # Minimal dependencies
+└── README.md
 ```
 
 ---
 
-## 🎓 Learning Objectives
+## Supported LLM Providers
 
-By completing this project, you will:
+The assistant checks for API keys in this order and uses the first available:
 
-- ✅ Understand RAG architecture and data flow
-- ✅ Implement text chunking strategies
-- ✅ Work with vector databases and embeddings
-- ✅ Build LLM-powered applications with LangChain
-- ✅ Handle multiple API providers
-- ✅ Create production-ready AI applications
+| Priority | Provider | Model (default) | Notes |
+|----------|----------|-----------------|-------|
+| 1st | OpenAI | `gpt-4o-mini` | Best quality, requires billing |
+| 2nd | Groq | `llama-3.1-8b-instant` | Free tier, fast inference |
+| 3rd | Google Gemini | `gemini-2.0-flash` | Free tier available |
+
+> Embeddings always use **Google Gemini** (`models/gemini-embedding-001`) regardless of which LLM is selected.
 
 ---
 
-## 🏁 Success Criteria
+## Setup & Installation
 
-Your implementation is complete when:
+### Prerequisites
 
-1. ✅ You can load your own documents
-2. ✅ The system chunks and embeds documents
-3. ✅ Search returns relevant results
-4. ✅ The RAG system generates contextual answers
-5. ✅ You can ask questions and get meaningful responses
+- Python 3.11+
+- At least one API key: [OpenAI](https://platform.openai.com/api-keys), [Groq](https://console.groq.com/keys), or [Google AI Studio](https://aistudio.google.com/app/apikey)
 
-**Good luck building your RAG system! 🚀**
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/your-username/rt-aaidc-project1-template.git
+cd rt-aaidc-project1-template
+```
+
+### 2. Create and activate a virtual environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate        # Linux / macOS
+.venv\Scripts\activate           # Windows
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure environment variables
+
+Create a `.env` file in the project root:
+
+```bash
+# OpenAI (optional)
+OPENAI_API_KEY=your-openai-key
+OPENAI_MODEL=gpt-4o-mini
+
+# Groq (optional)
+GROQ_API_KEY=your-groq-key
+GROQ_MODEL=llama-3.1-8b-instant
+
+# Google Gemini (required for embeddings)
+GOOGLE_API_KEY=your-google-key
+GOOGLE_MODEL=gemini-2.0-flash
+
+# Embedding model
+EMBEDDING_MODEL_NAME=models/gemini-embedding-001
+
+# ChromaDB
+CHROMA_COLLECTION_NAME=rag_documents
+```
+
+> At minimum, `GOOGLE_API_KEY` is required for embeddings. Add at least one LLM key (`OPENAI_API_KEY`, `GROQ_API_KEY`, or `GOOGLE_API_KEY`) to power the answer generation.
+
+### 5. Generate the knowledge base
+
+```bash
+python scripts/download_data.py
+```
+
+This writes 9 curated `.txt` files covering LangChain and LangGraph topics into the `data/` directory.
+
+---
+
+## How to Run
+
+```bash
+cd src
+python app.py
+```
+
+The assistant will load documents, build the vector index, and start an interactive prompt:
+
+```
+Initializing RAG Assistant...
+Using Groq model: llama-3.1-8b-instant
+Vector database initialized with collection: rag_documents
+RAG Assistant initialized successfully
+
+Loading documents...
+Loaded 9 sample documents
+Documents added to vector database (21 chunks total).
+
+Enter a question or 'quit' to exit:
+```
+
+Type a question and press Enter. Type `quit` to exit.
+
+---
+
+## Example Questions & Outputs
+
+**In-context question:**
+```
+Enter a question or 'quit' to exit: What is LCEL and how do I use the pipe operator?
+
+LCEL (LangChain Expression Language) is a declarative way to compose chains
+using the pipe operator (|). Basic syntax:
+
+    chain = prompt | llm | output_parser
+
+Each component implements the Runnable interface, which provides invoke(),
+stream(), batch(), and their async equivalents.
+```
+
+**Code generation:**
+```
+Enter a question or 'quit' to exit: How does LangGraph checkpointing work?
+
+Checkpointing is done using the MemorySaver class from langgraph.checkpoint.memory.
+
+    from langgraph.checkpoint.memory import MemorySaver
+
+    checkpointer = MemorySaver()
+    app = graph.compile(checkpointer=checkpointer)
+
+    config = {"configurable": {"thread_id": "session-1"}}
+    result = app.invoke(initial_state, config=config)
+
+The state is automatically restored when you resume the same thread.
+```
+
+**Out-of-context question (correct refusal):**
+```
+Enter a question or 'quit' to exit: What is the name of the Kenyan President?
+
+I don't have enough information to answer that question.
+```
+
+---
+
+## Known Limitations
+
+- **Static knowledge base** — Documents are loaded once at startup. Adding new documents requires restarting the app and re-indexing.
+- **No conversation memory** — Each question is answered independently; the assistant does not retain previous turns.
+- **Google Gemini free tier rate limits** — Embedding large document sets (500+ chunks) may hit quota limits on the free tier.
+- **Single data directory** — Only `.txt` files in `data/` are loaded; no support for PDFs or URLs out of the box.
+- **No source citation** — Answers do not indicate which document chunk they came from.
+
+---
+
+## Future Improvements
+
+- [ ] Add conversation memory for multi-turn dialogue
+- [ ] Support PDF and Markdown file ingestion
+- [ ] Display source citations alongside answers
+- [ ] Add a web UI (Streamlit or FastAPI + frontend)
+- [ ] Implement streaming responses for real-time token output
+- [ ] Support reranking for improved retrieval precision
+- [ ] Add evaluation pipeline using RAGAS metrics (faithfulness, context recall, etc.)
+- [ ] Dockerize the application for easier deployment
+
+---
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Framework | LangChain 0.3 |
+| Vector Store | ChromaDB 1.0 |
+| Embeddings | Google Gemini (`gemini-embedding-001`) |
+| LLM | OpenAI / Groq / Google Gemini |
+| Text Splitting | LangChain `RecursiveCharacterTextSplitter` |
+| Environment | Python 3.11, python-dotenv |
+
+---
+
+## License
+
+This project is licensed under the terms of the [LICENSE](LICENSE) file included in this repository.

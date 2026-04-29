@@ -1,0 +1,65 @@
+Chat Models in LangChain
+=========================
+Chat models are the core LLM interface in LangChain.
+They take a list of messages as input and return a message as output.
+
+Supported providers:
+    from langchain_openai import ChatOpenAI                    # OpenAI GPT-4o, GPT-4o-mini
+    from langchain_anthropic import ChatAnthropic              # Claude 3.5 Sonnet, Haiku
+    from langchain_google_genai import ChatGoogleGenerativeAI  # Gemini 2.0 Flash, Pro
+    from langchain_groq import ChatGroq                        # Llama 3.1, Mixtral (free)
+    from langchain_ollama import ChatOllama                    # Local models via Ollama
+    from langchain_mistralai import ChatMistralAI              # Mistral 7B, Large
+
+Basic usage:
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+    response = llm.invoke("What is LangChain?")
+    print(response.content)
+
+With structured messages:
+    from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+
+    messages = [
+        SystemMessage(content="You are a helpful assistant."),
+        HumanMessage(content="Explain RAG in one paragraph.")
+    ]
+    response = llm.invoke(messages)
+    print(response.content)
+
+Multi-turn conversation:
+    history = [SystemMessage(content="You are a coding assistant.")]
+    history.append(HumanMessage(content="What is a vector store?"))
+    response = llm.invoke(history)
+    history.append(response)  # AIMessage
+    history.append(HumanMessage(content="Give me a code example."))
+    response = llm.invoke(history)
+
+Streaming tokens:
+    for chunk in llm.stream("Tell me a joke"):
+        print(chunk.content, end="", flush=True)
+
+Async usage:
+    import asyncio
+
+    async def main():
+        response = await llm.ainvoke("What is LangGraph?")
+        print(response.content)
+
+    asyncio.run(main())
+
+Structured output (JSON):
+    from pydantic import BaseModel
+
+    class Answer(BaseModel):
+        answer: str
+        confidence: float
+
+    structured_llm = llm.with_structured_output(Answer)
+    result = structured_llm.invoke("What is the capital of France?")
+    print(result.answer, result.confidence)
+
+Key parameters:
+- temperature: 0.0 = deterministic/factual, 1.0 = creative/varied (best for RAG: 0.0)
+- max_tokens: Maximum tokens in the response
+- model: Specific model version to use
+- streaming: Enable token-by-token streaming

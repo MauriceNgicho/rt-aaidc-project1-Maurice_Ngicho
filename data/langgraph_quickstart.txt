@@ -1,0 +1,91 @@
+LangGraph Quickstart - Building a Simple Agent
+===============================================
+LangGraph makes it easy to build agents that can reason, use tools, and maintain state.
+
+Installation:
+    pip install langgraph langchain-openai
+
+Option 1 - Prebuilt ReAct agent (easiest):
+    from langchain_openai import ChatOpenAI
+    from langchain_core.tools import tool
+    from langgraph.prebuilt import create_react_agent
+
+    @tool
+    def get_weather(city: str) -> str:
+        """Get the current weather for a city."""
+        return f"The weather in {city} is sunny and 25 degrees Celsius."
+
+    @tool
+    def calculate(expression: str) -> str:
+        """Evaluate a mathematical expression."""
+        try:
+            return str(eval(expression))
+        except Exception as e:
+            return f"Error: {e}"
+
+    llm = ChatOpenAI(model="gpt-4o-mini")
+    agent = create_react_agent(llm, tools=[get_weather, calculate])
+
+    result = agent.invoke({
+        "messages": [("human", "What's the weather in Nairobi and what is 15 * 7?")]
+    })
+    print(result["messages"][-1].content)
+
+Option 2 - Custom StateGraph agent:
+    from langgraph.graph import StateGraph, END
+    from langchain_core.messages import BaseMessage, HumanMessage
+    from langchain_openai import ChatOpenAI
+    from typing import TypedDict, Annotated
+    import operator
+
+    class State(TypedDict):
+        messages: Annotated[list[BaseMessage], operator.add]
+
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+    def call_llm(state: State) -> dict:
+        response = llm.invoke(state["messages"])
+        return {"messages": [response]}
+
+    def should_continue(state: State) -> str:
+        last_message = state["messages"][-1]
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+            return "tools"
+        return "end"
+
+    graph = StateGraph(State)
+    graph.add_node("llm", call_llm)
+    graph.set_entry_point("llm")
+    graph.add_conditional_edges("llm", should_continue, {"tools": "llm", "end": END})
+
+    app = graph.compile()
+
+    result = app.invoke({"messages": [HumanMessage(content="Hello, how are you?")]})
+    print(result["messages"][-1].content)
+
+Adding memory to an agent:
+    from langgraph.checkpoint.memory import MemorySaver
+
+    memory = MemorySaver()
+    agent_with_memory = create_react_agent(llm, tools=[get_weather], checkpointer=memory)
+
+    config = {"configurable": {"thread_id": "conversation-1"}}
+
+    # First turn
+    agent_with_memory.invoke(
+        {"messages": [("human", "My name is Maurice.")]},
+        config=config
+    )
+
+    # Second turn — agent remembers the conversation
+    result = agent_with_memory.invoke(
+        {"messages": [("human", "What is my name?")]},
+        config=config
+    )
+    print(result["messages"][-1].content)  # "Your name is Maurice."
+
+LangGraph vs LangChain chains:
+- LangChain chains: linear pipeline, no cycles, stateless between calls
+- LangGraph: graph with cycles, persistent state, supports complex agent loops
+- Use LangChain chains for: simple sequential tasks, single-pass pipelines
+- Use LangGraph for: multi-step agents, tools, memory, human-in-the-loop workflows

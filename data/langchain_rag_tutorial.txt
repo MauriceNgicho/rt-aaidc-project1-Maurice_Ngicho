@@ -1,0 +1,87 @@
+RAG (Retrieval-Augmented Generation) Tutorial with LangChain
+=============================================================
+RAG combines a retriever with an LLM to answer questions grounded in external documents.
+It solves the problem of LLMs having outdated or missing knowledge.
+
+How RAG works:
+1. User asks a question
+2. The question is converted to an embedding vector
+3. Similar document chunks are retrieved from the vector store
+4. Retrieved chunks are injected into the LLM prompt as context
+5. The LLM generates an answer grounded in the retrieved context
+
+Full RAG pipeline:
+
+Step 1 - Load documents:
+    from langchain_community.document_loaders import TextLoader, DirectoryLoader
+
+    # Load a single file
+    loader = TextLoader("my_document.txt")
+    docs = loader.load()
+
+    # Load all .txt files from a directory
+    loader = DirectoryLoader("./data", glob="**/*.txt", loader_cls=TextLoader)
+    docs = loader.load()
+
+Step 2 - Split into chunks:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    chunks = splitter.split_documents(docs)
+    print(f"Split {len(docs)} documents into {len(chunks)} chunks")
+
+Step 3 - Embed and store:
+    from langchain_chroma import Chroma
+    from langchain_openai import OpenAIEmbeddings
+
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+    vectorstore = Chroma.from_documents(chunks, embeddings, persist_directory="./chroma_db")
+
+Step 4 - Create retriever:
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+
+Step 5 - Build RAG chain:
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.runnables import RunnablePassthrough
+    from langchain_openai import ChatOpenAI
+
+    prompt = ChatPromptTemplate.from_template(
+        """You are an expert assistant. Use only the context below to answer.
+        If the answer is not in the context, say you don't know.
+
+        Context:
+        {context}
+
+        Question: {question}
+
+        Answer:"""
+    )
+
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+    def format_docs(docs):
+        return "\n\n---\n\n".join(doc.page_content for doc in docs)
+
+    chain = (
+        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
+Step 6 - Query:
+    answer = chain.invoke("What is the main topic of the document?")
+    print(answer)
+
+Common failure modes in RAG:
+- Retrieval misses: The right chunk is not retrieved (fix: better chunking, more k)
+- Context too long: Too many chunks overflow the context window (fix: reduce k or chunk size)
+- Hallucination: LLM ignores context and makes up an answer (fix: stricter prompt)
+- Chunk boundary issues: Answer spans two chunks (fix: increase chunk_overlap)
+
+Evaluation metrics for RAG:
+- Faithfulness: Is the answer grounded in the retrieved context?
+- Answer relevancy: Does the answer address the question?
+- Context precision: Are the retrieved chunks actually relevant?
+- Context recall: Did retrieval find all the right chunks?

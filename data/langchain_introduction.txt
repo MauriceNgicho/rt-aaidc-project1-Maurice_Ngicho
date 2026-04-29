@@ -1,0 +1,39 @@
+LangChain Introduction
+======================
+LangChain is a framework for developing applications powered by large language models (LLMs).
+It provides a standard interface for models, embeddings, vector stores, and more.
+
+Core components:
+- Chat Models: Wrappers around LLM APIs (OpenAI, Groq, Google Gemini, Anthropic, etc.)
+- Prompt Templates: Reusable templates for constructing prompts
+- Output Parsers: Parse and transform LLM output (StrOutputParser, JsonOutputParser, etc.)
+- Chains: Sequences of calls composed with the pipe operator (|) using LCEL
+- Retrievers: Fetch relevant documents from a knowledge base
+- Vector Stores: Store and search document embeddings (ChromaDB, FAISS, Pinecone, etc.)
+- Tools: Functions that agents can call to interact with the world
+- Agents: LLMs that decide which actions to take using available tools
+
+LangChain integrates with dozens of LLM providers via a unified interface.
+Models can be swapped without changing application logic.
+
+Installation:
+    pip install langchain langchain-openai langchain-groq langchain-google-genai
+
+Key design principles:
+- Composability: Build complex pipelines from simple, reusable components
+- Provider-agnostic: Switch between OpenAI, Anthropic, Groq, and others with minimal changes
+- Streaming-first: All components support streaming out of the box
+- Observability: Built-in tracing and debugging via LangSmith
+
+LangChain vs alternatives:
+- LangChain: High-level framework with many integrations, great for rapid prototyping
+- LlamaIndex: Focuses specifically on data indexing and retrieval
+- Haystack: Pipeline-based framework popular in production NLP systems
+- Direct API: Maximum control but requires more boilerplate code
+
+Use cases:
+- Question answering over documents (RAG)
+- Conversational chatbots with memory
+- Autonomous agents that use tools
+- Data extraction and structured output generation
+- Summarization of long documents

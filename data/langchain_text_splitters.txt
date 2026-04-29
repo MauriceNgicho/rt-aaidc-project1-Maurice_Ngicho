@@ -1,0 +1,61 @@
+Text Splitters in LangChain
+============================
+Text splitters break large documents into smaller chunks for embedding and retrieval.
+Chunking strategy significantly affects RAG quality.
+
+RecursiveCharacterTextSplitter (recommended for most use cases):
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,        # max characters per chunk
+        chunk_overlap=200,      # overlap to preserve context across chunks
+        separators=["\n\n", "\n", " ", ""]  # tries these separators in order
+    )
+
+    # Split plain text
+    chunks = splitter.split_text(long_text)
+
+    # Split LangChain Document objects (preserves metadata)
+    documents = splitter.split_documents(docs)
+
+CharacterTextSplitter:
+    from langchain_text_splitters import CharacterTextSplitter
+
+    splitter = CharacterTextSplitter(
+        separator="\n\n",
+        chunk_size=1000,
+        chunk_overlap=200
+    )
+    # Splits on a single character. Less sophisticated but predictable.
+
+TokenTextSplitter:
+    from langchain_text_splitters import TokenTextSplitter
+
+    splitter = TokenTextSplitter(chunk_size=500, chunk_overlap=50)
+    # Splits by token count rather than character count.
+    # More accurate for LLM context window limits.
+
+MarkdownHeaderTextSplitter:
+    from langchain_text_splitters import MarkdownHeaderTextSplitter
+
+    headers = [("#", "Header 1"), ("##", "Header 2"), ("###", "Header 3")]
+    splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers)
+    # Splits on markdown headers, preserving document structure in metadata.
+
+RecursiveCharacterTextSplitter for code:
+    from langchain_text_splitters import Language
+
+    splitter = RecursiveCharacterTextSplitter.from_language(
+        language=Language.PYTHON,
+        chunk_size=1000,
+        chunk_overlap=200
+    )
+    # Uses language-aware separators (functions, classes, etc.)
+
+Best practices:
+- chunk_size of 500-1500 characters works well for most use cases
+- chunk_overlap of 10-20% of chunk_size prevents losing context at boundaries
+- Smaller chunks = better retrieval precision, more API calls
+- Larger chunks = more context per result, risk of exceeding context window
+- Always use split_documents() over split_text() to preserve source metadata
+- Test different chunk sizes and measure retrieval quality before committing
